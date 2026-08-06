@@ -2,6 +2,5 @@ from connectors.binance_connector import BinanceConnector
 
 connector = BinanceConnector()
 
-connector.authenticate()
-connector.get_balances()
-connector.get_trades()
+server_time = connector.get_server_time()
+print(server_time)

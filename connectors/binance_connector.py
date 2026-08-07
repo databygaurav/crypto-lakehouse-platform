@@ -1,9 +1,10 @@
 from connectors.base_connector import BaseConnector
-from clients.http_client import HTTPClient
+from clients.binance_client import BinanceClient
 
 class BinanceConnector(BaseConnector):
 
-    BASE_URL = "https://api.binance.com"
+    def __init__(self):
+        self.client = BinanceClient()
 
     def authenticate(self):
         print("Authentication will be implemented later.")
@@ -15,6 +16,7 @@ class BinanceConnector(BaseConnector):
         print("Trades will be implemented later.")
 
     def get_server_time(self):
-        url = f"{self.BASE_URL}/api/v3/time"
-
-        return HTTPClient.get(url)
+        return self.client.get_server_time()
+    
+    def get_account(self):
+        return self.client.get_account()

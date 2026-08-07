@@ -1,8 +1,9 @@
 from dotenv import load_dotenv
+from pathlib import Path
 import os
 
-# Load variables from the .env file
-load_dotenv()
+env_path = Path(__file__).resolve().parent.parent / ".env"
+load_dotenv(env_path)
 
 BINANCE_API_KEY = os.getenv("BINANCE_API_KEY")
 BINANCE_SECRET_KEY = os.getenv("BINANCE_SECRET_KEY")

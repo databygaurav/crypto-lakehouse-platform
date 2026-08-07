@@ -27,3 +27,6 @@ spark-warehouse/
 
 # Temporary files
 *.tmp
+
+# Raw data
+data/

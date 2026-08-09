@@ -3,30 +3,58 @@ from storage.local_storage import LocalStorage
 from storage.s3_storage import S3Storage
 
 
-# Get data from Binance
+# Create our components
 connector = BinanceConnector()
+local_storage = LocalStorage()
+s3_storage = S3Storage()
+
+
+# -------------------------
+# 1. Get account data
+# -------------------------
 
 account_data = connector.get_account()
 
-
-# Save data locally
-storage = LocalStorage()
-
-file_path = storage.save_json(
+account_file = local_storage.save_json(
     account_data,
     source="binance",
     data_type="account"
 )
 
-print("Saved to:", file_path)
+print("Account saved to:", account_file)
 
 
-# Upload the same file to S3
-s3_storage = S3Storage()
-
-s3_key = str(file_path).replace("\\", "/")
+# Upload account data to S3
+account_s3_key = str(account_file).replace("\\", "/")
 
 s3_storage.upload_file(
-    file_path,
-    s3_key
+    account_file,
+    account_s3_key
 )
+
+
+# -------------------------
+# 2. Get BTCUSDT trades
+# -------------------------
+
+trades = connector.get_trades("BTCUSDT")
+
+trade_file = local_storage.save_json(
+    trades,
+    source="binance",
+    data_type="trades"
+)
+
+print("Trades saved to:", trade_file)
+
+
+# Upload trades to S3
+trade_s3_key = str(trade_file).replace("\\", "/")
+
+s3_storage.upload_file(
+    trade_file,
+    trade_s3_key
+)
+
+
+print("Ingestion completed successfully!")

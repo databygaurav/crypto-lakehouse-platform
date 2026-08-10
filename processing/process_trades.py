@@ -1,10 +1,13 @@
 from pathlib import Path
 from datetime import datetime
+
 from processing.trade_processor import (
     load_trades,
     clean_trades,
     save_processed_trades,
 )
+
+from processing.parquet_writer import json_to_parquet
 
 from storage.s3_storage import S3Storage
 
@@ -42,7 +45,7 @@ for pair in TRADING_PAIRS:
         print("No JSON files found!")
         continue
 
-    # Find the latest raw file
+    # Find latest raw file
     latest_file = max(
         files,
         key=lambda file: file.stat().st_mtime
@@ -65,34 +68,64 @@ for pair in TRADING_PAIRS:
     cleaned_trades = clean_trades(trades)
 
     # -------------------------
-    # 3. Save processed file
+    # 3. Save processed JSON
     # -------------------------
 
     now = datetime.now()
 
-    output_path = (
+    processed_folder = (
         Path("data/processed/binance/trades")
         / pair
         / f"year={now.year}"
         / f"month={now.month:02d}"
         / f"day={now.day:02d}"
-        / latest_file.name
     )
+
+    processed_folder.mkdir(
+        parents=True,
+        exist_ok=True
+    )
+
+    json_output = processed_folder / latest_file.name
 
     save_processed_trades(
         cleaned_trades,
-        output_path
+        json_output
     )
 
     # -------------------------
-    # 4. Upload processed file
+    # 4. Upload processed JSON
     # -------------------------
 
-    s3_key = str(output_path).replace("\\", "/")
+    json_s3_key = str(json_output).replace("\\", "/")
 
     s3_storage.upload_file(
-        output_path,
-        s3_key
+        json_output,
+        json_s3_key
+    )
+
+    # -------------------------
+    # 5. Convert JSON → Parquet
+    # -------------------------
+
+    parquet_output = processed_folder / (
+        latest_file.stem + ".parquet"
+    )
+
+    json_to_parquet(
+        json_output,
+        parquet_output
+    )
+
+    # -------------------------
+    # 6. Upload Parquet to S3
+    # -------------------------
+
+    parquet_s3_key = str(parquet_output).replace("\\", "/")
+
+    s3_storage.upload_file(
+        parquet_output,
+        parquet_s3_key
     )
 
 

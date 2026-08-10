@@ -3,6 +3,17 @@ from storage.local_storage import LocalStorage
 from storage.s3_storage import S3Storage
 
 
+# Trading pairs we want to ingest
+TRADING_PAIRS = [
+    "BTCUSDT",
+    "ETHUSDT",
+    "SOLUSDT",
+    "SUIUSDT",
+    "LINKUSDT",
+    "ONDOUSDT",
+]
+
+
 # Create our components
 connector = BinanceConnector()
 local_storage = LocalStorage()
@@ -34,27 +45,32 @@ s3_storage.upload_file(
 
 
 # -------------------------
-# 2. Get BTCUSDT trades
+# 2. Get trades
 # -------------------------
 
-trades = connector.get_trades("BTCUSDT")
+for pair in TRADING_PAIRS:
 
-trade_file = local_storage.save_json(
-    trades,
-    source="binance",
-    data_type="trades"
-)
+    print(f"\nGetting trades for {pair}...")
 
-print("Trades saved to:", trade_file)
+    trades = connector.get_trades(pair)
 
+    trade_file = local_storage.save_json(
+        trades,
+        source="binance",
+        data_type="trades",
+        symbol=pair
+    )
 
-# Upload trades to S3
-trade_s3_key = str(trade_file).replace("\\", "/")
-
-s3_storage.upload_file(
-    trade_file,
-    trade_s3_key
-)
+    print("Trades saved to:", trade_file)
 
 
-print("Ingestion completed successfully!")
+    # Upload trades to S3
+    trade_s3_key = str(trade_file).replace("\\", "/")
+
+    s3_storage.upload_file(
+        trade_file,
+        trade_s3_key
+    )
+
+
+print("\nIngestion completed successfully!")

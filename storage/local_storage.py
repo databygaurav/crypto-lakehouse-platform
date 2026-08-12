@@ -20,14 +20,7 @@ class LocalStorage:
         # Add trading pair folder if provided
         if symbol:
             folder = folder / symbol
-
-        folder = (
-            folder
-            / f"year={now.year}"
-            / f"month={now.month:02d}"
-            / f"day={now.day:02d}"
-        )
-
+            
         folder.mkdir(parents=True, exist_ok=True)
 
         filename = (

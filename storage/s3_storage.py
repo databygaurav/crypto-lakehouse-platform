@@ -3,7 +3,7 @@ import boto3
 from config.settings import (
     AWS_ACCESS_KEY_ID,
     AWS_SECRET_ACCESS_KEY,
-    S3_BUCKET
+    AWS_S3_BUCKET
 )
 
 
@@ -20,7 +20,7 @@ class S3Storage:
 
         self.s3.upload_file(
             local_file,
-            S3_BUCKET,
+            AWS_S3_BUCKET,
             s3_key
         )
 

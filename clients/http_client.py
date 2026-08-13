@@ -2,20 +2,37 @@ import requests
 
 
 class HTTPClient:
-    """Reusable HTTP client for making API requests."""
 
     @staticmethod
     def get(
-        url: str,
-        params: dict | None = None,
-        headers: dict | None = None,
+        url,
+        params=None,
+        headers=None
     ):
+
         response = requests.get(
             url=url,
             params=params,
-            headers=headers,
-            timeout=10,
+            headers=headers
         )
+
+        if not response.ok:
+
+            print("\nHTTP ERROR")
+            print(
+                "Status:",
+                response.status_code
+            )
+
+            print(
+                "Response:",
+                response.text
+            )
+
+            print(
+                "URL:",
+                response.url
+            )
 
         response.raise_for_status()
 

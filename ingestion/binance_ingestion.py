@@ -19,13 +19,32 @@ TRADING_PAIRS = [
 ]
 
 
-# Historical P2P range
+# Historical start date
 # January 1, 2026
-P2P_START_TIMESTAMP = 1767225600000
+
+HISTORY_START = datetime(
+    2026,
+    1,
+    1,
+    tzinfo=timezone.utc
+)
+
 
 # Current date/time
+
+HISTORY_END = datetime.now(
+    timezone.utc
+)
+
+
+# P2P API timestamps
+
+P2P_START_TIMESTAMP = int(
+    HISTORY_START.timestamp() * 1000
+)
+
 P2P_END_TIMESTAMP = int(
-    datetime.now(timezone.utc).timestamp() * 1000
+    HISTORY_END.timestamp() * 1000
 )
 
 
@@ -34,7 +53,9 @@ P2P_END_TIMESTAMP = int(
 # ============================================================
 
 connector = BinanceConnector()
+
 local_storage = LocalStorage()
+
 s3_storage = S3Storage()
 
 
@@ -52,10 +73,14 @@ account_file = local_storage.save_json(
     data_type="account"
 )
 
-print("Account saved to:", account_file)
+print(
+    "Account saved to:",
+    account_file
+)
 
-
-account_s3_key = str(account_file).replace("\\", "/")
+account_s3_key = str(
+    account_file
+).replace("\\", "/")
 
 s3_storage.upload_file(
     account_file,
@@ -69,9 +94,13 @@ s3_storage.upload_file(
 
 for pair in TRADING_PAIRS:
 
-    print(f"\nGetting trades for {pair}...")
+    print(
+        f"\nGetting trades for {pair}..."
+    )
 
-    trades = connector.get_trades(pair)
+    trades = connector.get_trades(
+        pair
+    )
 
     trade_file = local_storage.save_json(
         trades,
@@ -80,9 +109,14 @@ for pair in TRADING_PAIRS:
         symbol=pair
     )
 
-    print("Trades saved to:", trade_file)
+    print(
+        "Trades saved to:",
+        trade_file
+    )
 
-    trade_s3_key = str(trade_file).replace("\\", "/")
+    trade_s3_key = str(
+        trade_file
+    ).replace("\\", "/")
 
     s3_storage.upload_file(
         trade_file,
@@ -91,10 +125,12 @@ for pair in TRADING_PAIRS:
 
 
 # ============================================================
-# 3. P2P BUY TRANSACTIONS
+# 3. P2P BUY
 # ============================================================
 
-print("\nGetting Binance P2P BUY transactions...")
+print(
+    "\nGetting Binance P2P BUY transactions..."
+)
 
 p2p_buy_data = connector.get_p2p_transactions(
     trade_type="BUY",
@@ -104,13 +140,15 @@ p2p_buy_data = connector.get_p2p_transactions(
     end_timestamp=P2P_END_TIMESTAMP
 )
 
-p2p_buy_records = p2p_buy_data.get("data", [])
-
-print(
-    f"P2P BUY transactions received: "
-    f"{len(p2p_buy_records)}"
+p2p_buy_records = p2p_buy_data.get(
+    "data",
+    []
 )
 
+print(
+    "P2P BUY transactions received:",
+    len(p2p_buy_records)
+)
 
 p2p_buy_file = local_storage.save_json(
     p2p_buy_data,
@@ -118,10 +156,14 @@ p2p_buy_file = local_storage.save_json(
     data_type="p2p_buy"
 )
 
-print("P2P BUY saved to:", p2p_buy_file)
+print(
+    "P2P BUY saved to:",
+    p2p_buy_file
+)
 
-
-p2p_buy_s3_key = str(p2p_buy_file).replace("\\", "/")
+p2p_buy_s3_key = str(
+    p2p_buy_file
+).replace("\\", "/")
 
 s3_storage.upload_file(
     p2p_buy_file,
@@ -130,10 +172,12 @@ s3_storage.upload_file(
 
 
 # ============================================================
-# 4. P2P SELL TRANSACTIONS
+# 4. P2P SELL
 # ============================================================
 
-print("\nGetting Binance P2P SELL transactions...")
+print(
+    "\nGetting Binance P2P SELL transactions..."
+)
 
 p2p_sell_data = connector.get_p2p_transactions(
     trade_type="SELL",
@@ -143,13 +187,15 @@ p2p_sell_data = connector.get_p2p_transactions(
     end_timestamp=P2P_END_TIMESTAMP
 )
 
-p2p_sell_records = p2p_sell_data.get("data", [])
-
-print(
-    f"P2P SELL transactions received: "
-    f"{len(p2p_sell_records)}"
+p2p_sell_records = p2p_sell_data.get(
+    "data",
+    []
 )
 
+print(
+    "P2P SELL transactions received:",
+    len(p2p_sell_records)
+)
 
 p2p_sell_file = local_storage.save_json(
     p2p_sell_data,
@@ -157,10 +203,14 @@ p2p_sell_file = local_storage.save_json(
     data_type="p2p_sell"
 )
 
-print("P2P SELL saved to:", p2p_sell_file)
+print(
+    "P2P SELL saved to:",
+    p2p_sell_file
+)
 
-
-p2p_sell_s3_key = str(p2p_sell_file).replace("\\", "/")
+p2p_sell_s3_key = str(
+    p2p_sell_file
+).replace("\\", "/")
 
 s3_storage.upload_file(
     p2p_sell_file,
@@ -169,9 +219,137 @@ s3_storage.upload_file(
 
 
 # ============================================================
+# 5. DEPOSIT HISTORY
+# ============================================================
+
+print(
+    "\nGetting Binance deposit history..."
+)
+
+deposits = connector.get_all_deposits(
+    start_datetime=HISTORY_START,
+    end_datetime=HISTORY_END
+)
+
+print(
+    "Deposits received:",
+    len(deposits)
+)
+
+deposit_file = local_storage.save_json(
+    deposits,
+    source="binance",
+    data_type="deposits"
+)
+
+print(
+    "Deposits saved to:",
+    deposit_file
+)
+
+deposit_s3_key = str(
+    deposit_file
+).replace("\\", "/")
+
+s3_storage.upload_file(
+    deposit_file,
+    deposit_s3_key
+)
+
+
+# ============================================================
+# 6. WITHDRAWAL HISTORY
+# ============================================================
+
+print(
+    "\nGetting Binance withdrawal history..."
+)
+
+withdrawals = connector.get_all_withdrawals(
+    start_datetime=HISTORY_START,
+    end_datetime=HISTORY_END
+)
+
+print(
+    "Withdrawals received:",
+    len(withdrawals)
+)
+
+withdrawal_file = local_storage.save_json(
+    withdrawals,
+    source="binance",
+    data_type="withdrawals"
+)
+
+print(
+    "Withdrawals saved to:",
+    withdrawal_file
+)
+
+withdrawal_s3_key = str(
+    withdrawal_file
+).replace("\\", "/")
+
+s3_storage.upload_file(
+    withdrawal_file,
+    withdrawal_s3_key
+)
+
+
+# ============================================================
+# 7. INTERNAL TRANSFERS
+# ============================================================
+
+print(
+    "\nGetting Binance internal transfers..."
+)
+
+# IMPORTANT:
+# This is the transfer type we previously tested.
+#
+# MAIN_UMFUTURE =
+# Binance Spot/Main Account
+# ->
+# USDⓈ-M Futures Account
+
+TRANSFER_TYPE = "MAIN_UMFUTURE"
+
+
+transfers = connector.get_all_transfers(
+    end_datetime=HISTORY_END,
+    transfer_type=TRANSFER_TYPE
+)
+
+print(
+    "Internal transfers received:",
+    len(transfers)
+)
+
+transfer_file = local_storage.save_json(
+    transfers,
+    source="binance",
+    data_type="transfers"
+)
+
+print(
+    "Transfers saved to:",
+    transfer_file
+)
+
+transfer_s3_key = str(
+    transfer_file
+).replace("\\", "/")
+
+s3_storage.upload_file(
+    transfer_file,
+    transfer_s3_key
+)
+
+
+# ============================================================
 # COMPLETE
 # ============================================================
 
 print("\n========================================")
-print("Ingestion completed successfully!")
+print("Binance ingestion completed successfully!")
 print("========================================")

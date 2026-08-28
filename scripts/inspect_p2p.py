@@ -1,7 +1,7 @@
-from connectors.binance_connector import BinanceConnector
+from clients.binance_client import BinanceClient
 
 
-connector = BinanceConnector()
+client = BinanceClient()
 
 
 # ============================================================
@@ -23,7 +23,7 @@ print("=" * 70)
 print("BUY P2P TRANSACTIONS")
 print("=" * 70)
 
-buy_data = connector.get_p2p_transactions(
+buy_data = client.get_p2p_transactions(
     trade_type="BUY",
     page=1,
     rows=100,
@@ -72,7 +72,7 @@ print("SELL P2P TRANSACTIONS")
 print("=" * 70)
 
 
-sell_data = connector.get_p2p_transactions(
+sell_data = client.get_p2p_transactions(
     trade_type="SELL",
     page=1,
     rows=100,

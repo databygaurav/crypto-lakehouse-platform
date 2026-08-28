@@ -1,355 +1,234 @@
-from datetime import datetime, timezone
+"""Download raw Binance data and save it locally and optionally to S3."""
 
-from connectors.binance_connector import BinanceConnector
+import argparse
+from datetime import datetime, timedelta, timezone
+
+from clients.binance_client import BinanceClient
+from config.settings import BINANCE_HISTORY_START
 from storage.local_storage import LocalStorage
 from storage.s3_storage import S3Storage
+from utils.history_fetcher import fetch_klines_history
 
 
-# ============================================================
-# CONFIGURATION
-# ============================================================
-
-TRADING_PAIRS = [
+# Edit these lists when you want to collect another trading pair or transfer type.
+TRADING_PAIRS = (
     "BTCUSDT",
     "ETHUSDT",
     "SOLUSDT",
     "SUIUSDT",
     "LINKUSDT",
     "ONDOUSDT",
-]
-
-
-# Historical start date
-# January 1, 2026
-
-HISTORY_START = datetime(
-    2026,
-    1,
-    1,
-    tzinfo=timezone.utc
 )
 
-
-# Current date/time
-
-HISTORY_END = datetime.now(
-    timezone.utc
+TRANSFER_TYPES = (
+    "MAIN_UMFUTURE",
 )
 
-
-# P2P API timestamps
-
-P2P_START_TIMESTAMP = int(
-    HISTORY_START.timestamp() * 1000
-)
-
-P2P_END_TIMESTAMP = int(
-    HISTORY_END.timestamp() * 1000
-)
+PRICE_INTERVAL = "1d"
 
 
-# ============================================================
-# CREATE COMPONENTS
-# ============================================================
+def save_raw_data(
+    data,
+    local_storage,
+    s3_storage,
+    data_type,
+    symbol=None,
+):
+    """Save one raw API response locally, then optionally upload it to S3."""
 
-connector = BinanceConnector()
-
-local_storage = LocalStorage()
-
-s3_storage = S3Storage()
-
-
-# ============================================================
-# 1. ACCOUNT
-# ============================================================
-
-print("\nGetting Binance account...")
-
-account_data = connector.get_account()
-
-account_file = local_storage.save_json(
-    account_data,
-    source="binance",
-    data_type="account"
-)
-
-print(
-    "Account saved to:",
-    account_file
-)
-
-account_s3_key = str(
-    account_file
-).replace("\\", "/")
-
-s3_storage.upload_file(
-    account_file,
-    account_s3_key
-)
-
-
-# ============================================================
-# 2. SPOT TRADES
-# ============================================================
-
-for pair in TRADING_PAIRS:
-
-    print(
-        f"\nGetting trades for {pair}..."
-    )
-
-    trades = connector.get_trades(
-        pair
-    )
-
-    trade_file = local_storage.save_json(
-        trades,
+    file_path = local_storage.save_json(
+        data=data,
         source="binance",
-        data_type="trades",
-        symbol=pair
+        data_type=data_type,
+        symbol=symbol,
     )
 
-    print(
-        "Trades saved to:",
-        trade_file
+    if s3_storage is not None:
+        s3_storage.upload_file(
+            local_file=file_path,
+            s3_key=file_path.as_posix(),
+        )
+
+    print(f"Saved {data_type}: {file_path}")
+    return file_path
+
+
+def get_price_history(client, symbol, start_time, end_time):
+    """Download all daily price candles for one trading pair."""
+
+    return fetch_klines_history(
+        get_klines=client.get_klines,
+        symbol=symbol,
+        interval=PRICE_INTERVAL,
+        start_time=int(start_time.timestamp() * 1000),
+        end_time=int(end_time.timestamp() * 1000),
+        limit=1000,
     )
 
-    trade_s3_key = str(
-        trade_file
-    ).replace("\\", "/")
 
-    s3_storage.upload_file(
-        trade_file,
-        trade_s3_key
+def run_ingestion(
+    client=None,
+    local_storage=None,
+    s3_storage=None,
+    history_start=BINANCE_HISTORY_START,
+    history_end=None,
+    trading_pairs=TRADING_PAIRS,
+    transfer_types=TRANSFER_TYPES,
+    upload_to_s3=True,
+):
+    """Run the complete raw-data ingestion pipeline.
+
+    This function only downloads and stores raw data. It does not clean,
+    transform, or aggregate the records.
+    """
+
+    history_end = history_end or datetime.now(timezone.utc)
+
+    if history_start.tzinfo is None or history_end.tzinfo is None:
+        raise ValueError("History dates must be timezone-aware")
+
+    if history_start >= history_end:
+        raise ValueError("history_start must be before history_end")
+
+    client = client or BinanceClient()
+    local_storage = local_storage or LocalStorage()
+
+    if upload_to_s3:
+        s3_storage = s3_storage or S3Storage()
+    else:
+        s3_storage = None
+
+    saved_files = {}
+
+    def save(name, data, symbol=None):
+        """Short local helper that keeps the steps below easy to read."""
+
+        saved_files[name] = save_raw_data(
+            data=data,
+            local_storage=local_storage,
+            s3_storage=s3_storage,
+            data_type=name.split(":", 1)[0],
+            symbol=symbol,
+        )
+
+    print("1. Downloading account snapshot...")
+    save("account", client.get_account())
+
+    print("2. Downloading Spot trades...")
+    for symbol in trading_pairs:
+        save(
+            f"trades:{symbol}",
+            client.get_all_trades(symbol=symbol),
+            symbol=symbol,
+        )
+
+    print("3. Downloading Convert trades...")
+    save(
+        "convert_trades",
+        client.get_all_convert_trades(
+            start_datetime=history_start,
+            end_datetime=history_end,
+        ),
     )
 
+    # Binance exposes P2P history for only the latest six months.
+    p2p_start = max(
+        history_start,
+        history_end - timedelta(days=180),
+    )
 
-# ============================================================
-# 3. P2P BUY
-# ============================================================
+    print("4. Downloading P2P orders...")
+    for trade_type in ("BUY", "SELL"):
+        name = f"p2p_{trade_type.lower()}"
+        save(
+            name,
+            client.get_all_p2p_transactions(
+                trade_type=trade_type,
+                start_datetime=p2p_start,
+                end_datetime=history_end,
+            ),
+        )
 
-print(
-    "\nGetting Binance P2P BUY transactions..."
-)
+    print("5. Downloading deposits and withdrawals...")
+    save(
+        "deposits",
+        client.get_all_deposits(
+            start_datetime=history_start,
+            end_datetime=history_end,
+        ),
+    )
+    save(
+        "withdrawals",
+        client.get_all_withdrawals(
+            start_datetime=history_start,
+            end_datetime=history_end,
+        ),
+    )
 
-p2p_buy_data = connector.get_p2p_transactions(
-    trade_type="BUY",
-    page=1,
-    rows=100,
-    start_timestamp=P2P_START_TIMESTAMP,
-    end_timestamp=P2P_END_TIMESTAMP
-)
+    print("6. Downloading account transfers...")
+    for transfer_type in transfer_types:
+        save(
+            f"transfers:{transfer_type}",
+            client.get_all_transfers(
+                end_datetime=history_end,
+                transfer_type=transfer_type,
+            ),
+            symbol=transfer_type,
+        )
 
-p2p_buy_records = p2p_buy_data.get(
-    "data",
-    []
-)
+    print("7. Downloading daily price history...")
+    for symbol in trading_pairs:
+        prices = get_price_history(
+            client=client,
+            symbol=symbol,
+            start_time=history_start,
+            end_time=history_end,
+        )
 
-print(
-    "P2P BUY transactions received:",
-    len(p2p_buy_records)
-)
+        if prices:
+            save(
+                f"price_history:{symbol}",
+                prices,
+                symbol=symbol,
+            )
+        else:
+            print(f"No price history returned for {symbol}")
 
-p2p_buy_file = local_storage.save_json(
-    p2p_buy_data,
-    source="binance",
-    data_type="p2p_buy"
-)
+    manifest = {
+        "source": "binance",
+        "history_start": history_start.isoformat(),
+        "history_end": history_end.isoformat(),
+        "completed_at": datetime.now(timezone.utc).isoformat(),
+        "files": {
+            name: str(path)
+            for name, path in saved_files.items()
+        },
+    }
+    save("ingestion_manifest", manifest)
 
-print(
-    "P2P BUY saved to:",
-    p2p_buy_file
-)
-
-p2p_buy_s3_key = str(
-    p2p_buy_file
-).replace("\\", "/")
-
-s3_storage.upload_file(
-    p2p_buy_file,
-    p2p_buy_s3_key
-)
-
-
-# ============================================================
-# 4. P2P SELL
-# ============================================================
-
-print(
-    "\nGetting Binance P2P SELL transactions..."
-)
-
-p2p_sell_data = connector.get_p2p_transactions(
-    trade_type="SELL",
-    page=1,
-    rows=100,
-    start_timestamp=P2P_START_TIMESTAMP,
-    end_timestamp=P2P_END_TIMESTAMP
-)
-
-p2p_sell_records = p2p_sell_data.get(
-    "data",
-    []
-)
-
-print(
-    "P2P SELL transactions received:",
-    len(p2p_sell_records)
-)
-
-p2p_sell_file = local_storage.save_json(
-    p2p_sell_data,
-    source="binance",
-    data_type="p2p_sell"
-)
-
-print(
-    "P2P SELL saved to:",
-    p2p_sell_file
-)
-
-p2p_sell_s3_key = str(
-    p2p_sell_file
-).replace("\\", "/")
-
-s3_storage.upload_file(
-    p2p_sell_file,
-    p2p_sell_s3_key
-)
+    return saved_files
 
 
-# ============================================================
-# 5. DEPOSIT HISTORY
-# ============================================================
+def main():
+    """Read command-line options and start ingestion."""
 
-print(
-    "\nGetting Binance deposit history..."
-)
+    parser = argparse.ArgumentParser(
+        description="Download raw Binance data"
+    )
+    parser.add_argument(
+        "--local-only",
+        "--no-s3",
+        action="store_true",
+        dest="local_only",
+        help="Save locally without uploading to S3",
+    )
+    args = parser.parse_args()
 
-deposits = connector.get_all_deposits(
-    start_datetime=HISTORY_START,
-    end_datetime=HISTORY_END
-)
-
-print(
-    "Deposits received:",
-    len(deposits)
-)
-
-deposit_file = local_storage.save_json(
-    deposits,
-    source="binance",
-    data_type="deposits"
-)
-
-print(
-    "Deposits saved to:",
-    deposit_file
-)
-
-deposit_s3_key = str(
-    deposit_file
-).replace("\\", "/")
-
-s3_storage.upload_file(
-    deposit_file,
-    deposit_s3_key
-)
+    files = run_ingestion(
+        upload_to_s3=not args.local_only
+    )
+    print(f"Done. Saved {len(files)} raw datasets.")
 
 
-# ============================================================
-# 6. WITHDRAWAL HISTORY
-# ============================================================
-
-print(
-    "\nGetting Binance withdrawal history..."
-)
-
-withdrawals = connector.get_all_withdrawals(
-    start_datetime=HISTORY_START,
-    end_datetime=HISTORY_END
-)
-
-print(
-    "Withdrawals received:",
-    len(withdrawals)
-)
-
-withdrawal_file = local_storage.save_json(
-    withdrawals,
-    source="binance",
-    data_type="withdrawals"
-)
-
-print(
-    "Withdrawals saved to:",
-    withdrawal_file
-)
-
-withdrawal_s3_key = str(
-    withdrawal_file
-).replace("\\", "/")
-
-s3_storage.upload_file(
-    withdrawal_file,
-    withdrawal_s3_key
-)
-
-
-# ============================================================
-# 7. INTERNAL TRANSFERS
-# ============================================================
-
-print(
-    "\nGetting Binance internal transfers..."
-)
-
-# IMPORTANT:
-# This is the transfer type we previously tested.
-#
-# MAIN_UMFUTURE =
-# Binance Spot/Main Account
-# ->
-# USDⓈ-M Futures Account
-
-TRANSFER_TYPE = "MAIN_UMFUTURE"
-
-
-transfers = connector.get_all_transfers(
-    end_datetime=HISTORY_END,
-    transfer_type=TRANSFER_TYPE
-)
-
-print(
-    "Internal transfers received:",
-    len(transfers)
-)
-
-transfer_file = local_storage.save_json(
-    transfers,
-    source="binance",
-    data_type="transfers"
-)
-
-print(
-    "Transfers saved to:",
-    transfer_file
-)
-
-transfer_s3_key = str(
-    transfer_file
-).replace("\\", "/")
-
-s3_storage.upload_file(
-    transfer_file,
-    transfer_s3_key
-)
-
-
-# ============================================================
-# COMPLETE
-# ============================================================
-
-print("\n========================================")
-print("Binance ingestion completed successfully!")
-print("========================================")
+if __name__ == "__main__":
+    main()

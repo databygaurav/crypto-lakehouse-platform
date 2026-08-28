@@ -1,8 +1,6 @@
 from datetime import datetime, timezone
 
-from connectors.binance_connector import (
-    BinanceConnector
-)
+from clients.binance_client import BinanceClient
 
 from config.settings import (
     BINANCE_HISTORY_START
@@ -13,7 +11,7 @@ from config.settings import (
 # CONNECTOR
 # ============================================================
 
-connector = BinanceConnector()
+client = BinanceClient()
 
 
 # ============================================================
@@ -57,7 +55,7 @@ print("DEPOSIT HISTORY")
 print("=" * 70)
 
 
-deposits = connector.get_all_deposits(
+deposits = client.get_all_deposits(
     start_datetime=START_DATE,
     end_datetime=END_DATE
 )
@@ -106,7 +104,7 @@ print("WITHDRAWAL HISTORY")
 print("=" * 70)
 
 
-withdrawals = connector.get_all_withdrawals(
+withdrawals = client.get_all_withdrawals(
     start_datetime=START_DATE,
     end_datetime=END_DATE
 )
@@ -167,7 +165,7 @@ print("=" * 70)
 TRANSFER_TYPE = "MAIN_UMFUTURE"
 
 
-transfers = connector.get_all_transfers(
+transfers = client.get_all_transfers(
     end_datetime=END_DATE,
     transfer_type=TRANSFER_TYPE
 )

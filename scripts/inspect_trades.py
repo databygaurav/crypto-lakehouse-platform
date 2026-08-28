@@ -1,7 +1,7 @@
-from connectors.binance_connector import BinanceConnector
+from clients.binance_client import BinanceClient
 
 
-connector = BinanceConnector()
+client = BinanceClient()
 
 trading_pairs = [
     "BTCUSDT",
@@ -16,6 +16,6 @@ trading_pairs = [
 for pair in trading_pairs:
     print(f"\nGetting trades for {pair}...")
 
-    trades = connector.get_trades(pair)
+    trades = client.get_trades(pair)
 
     print(f"{pair}: {len(trades)} trades found")

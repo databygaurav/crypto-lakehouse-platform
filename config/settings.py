@@ -12,6 +12,10 @@ load_dotenv()
 BINANCE_API_KEY = os.getenv("BINANCE_API_KEY")
 BINANCE_SECRET_KEY = os.getenv("BINANCE_SECRET_KEY")
 
+# Giottus
+GIOTTUS_API_KEY = os.getenv("GIOTTUS_API_KEY")
+GIOTTUS_SECRET_KEY = os.getenv("GIOTTUS_SECRET_KEY")
+
 # S3 credentials are optional when your normal AWS login or IAM role is used.
 AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")

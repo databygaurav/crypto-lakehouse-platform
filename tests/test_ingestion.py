@@ -1,6 +1,8 @@
+import json
 import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from unittest.mock import Mock
 
 from ingestion.binance_ingestion import run_ingestion
@@ -12,6 +14,7 @@ class IngestionTests(unittest.TestCase):
     def test_run_is_explicit_and_supports_local_only_mode(self):
         client = Mock()
         client.get_account.return_value = {"balances": []}
+        client.get_funding_wallet.return_value = []
         client.get_all_trades.return_value = []
         client.get_all_convert_trades.return_value = []
         client.get_all_p2p_transactions.return_value = []
@@ -38,13 +41,31 @@ class IngestionTests(unittest.TestCase):
                 upload_to_s3=False
             )
 
+            with Path(outputs["funding_account"]).open(
+                "r",
+                encoding="utf-8"
+            ) as file:
+                funding_snapshot = json.load(file)
+
+            self.assertEqual(
+                funding_snapshot["walletType"],
+                "FUNDING"
+            )
+            self.assertEqual(
+                funding_snapshot["balances"],
+                []
+            )
+            self.assertIn("capturedAt", funding_snapshot)
+
         self.assertIn("account", outputs)
+        self.assertIn("funding_account", outputs)
         self.assertIn("trades:SOLUSDT", outputs)
         self.assertIn("convert_trades", outputs)
         self.assertIn("ingestion_manifest", outputs)
         client.get_all_trades.assert_called_once_with(
             symbol="SOLUSDT"
         )
+        client.get_funding_wallet.assert_called_once_with()
 
 
 if __name__ == "__main__":

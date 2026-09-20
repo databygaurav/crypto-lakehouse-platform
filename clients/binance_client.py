@@ -83,6 +83,30 @@ class BinanceClient:
             headers={"X-MBX-APIKEY": self.api_key},
         )
 
+    def _signed_post(self, endpoint, **params):
+        """Send one authenticated POST request to Binance."""
+
+        params = {
+            name: value
+            for name, value in params.items()
+            if value is not None
+        }
+
+        server_time = self.get_server_time()
+        params["timestamp"] = server_time["serverTime"]
+
+        query_string = urlencode(params)
+        params["signature"] = generate_signature(
+            self.secret_key,
+            query_string,
+        )
+
+        return self.http_client.post(
+            url=f"{self.BASE_URL}{endpoint}",
+            data=params,
+            headers={"X-MBX-APIKEY": self.api_key},
+        )
+
     # -----------------------------------------------------------------
     # Account and Spot trades
     # -----------------------------------------------------------------
@@ -91,6 +115,21 @@ class BinanceClient:
         """Fetch the current Binance account snapshot."""
 
         return self._signed_get("/api/v3/account")
+
+    def get_funding_wallet(self):
+        """Fetch the current Binance Funding wallet balances."""
+
+        balances = self._signed_post(
+            "/sapi/v1/asset/get-funding-asset",
+            needBtcValuation="false",
+        )
+
+        if not isinstance(balances, list):
+            raise RuntimeError(
+                "Binance Funding wallet response must be a list"
+            )
+
+        return balances
 
     def get_trades(self, symbol, from_id=None, limit=1000):
         """Fetch one page of Spot trades."""

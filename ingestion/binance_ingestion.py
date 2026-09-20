@@ -114,7 +114,15 @@ def run_ingestion(
     print("1. Downloading account snapshot...")
     save("account", client.get_account())
 
-    print("2. Downloading Spot trades...")
+    print("2. Downloading Funding wallet snapshot...")
+    funding_snapshot = {
+        "walletType": "FUNDING",
+        "capturedAt": datetime.now(timezone.utc).isoformat(),
+        "balances": client.get_funding_wallet(),
+    }
+    save("funding_account", funding_snapshot)
+
+    print("3. Downloading Spot trades...")
     for symbol in trading_pairs:
         save(
             f"trades:{symbol}",
@@ -122,7 +130,7 @@ def run_ingestion(
             symbol=symbol,
         )
 
-    print("3. Downloading Convert trades...")
+    print("4. Downloading Convert trades...")
     save(
         "convert_trades",
         client.get_all_convert_trades(
@@ -137,7 +145,7 @@ def run_ingestion(
         history_end - timedelta(days=180),
     )
 
-    print("4. Downloading P2P orders...")
+    print("5. Downloading P2P orders...")
     for trade_type in ("BUY", "SELL"):
         name = f"p2p_{trade_type.lower()}"
         save(
@@ -149,7 +157,7 @@ def run_ingestion(
             ),
         )
 
-    print("5. Downloading deposits and withdrawals...")
+    print("6. Downloading deposits and withdrawals...")
     save(
         "deposits",
         client.get_all_deposits(
@@ -165,7 +173,7 @@ def run_ingestion(
         ),
     )
 
-    print("6. Downloading account transfers...")
+    print("7. Downloading account transfers...")
     for transfer_type in transfer_types:
         save(
             f"transfers:{transfer_type}",
@@ -176,7 +184,7 @@ def run_ingestion(
             symbol=transfer_type,
         )
 
-    print("7. Downloading daily price history...")
+    print("8. Downloading daily price history...")
     for symbol in trading_pairs:
         prices = get_price_history(
             client=client,

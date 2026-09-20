@@ -56,3 +56,33 @@ class HTTPClient:
             raise RuntimeError(
                 "Remote API returned invalid JSON"
             ) from error
+
+    @classmethod
+    def post(
+        cls,
+        url,
+        data=None,
+        headers=None,
+        timeout=(5, 30)
+    ):
+        """Perform a POST request and return JSON."""
+
+        response = cls._session.post(
+            url=url,
+            data=data,
+            headers=headers,
+            timeout=timeout
+        )
+
+        if not response.ok:
+            raise requests.HTTPError(
+                f"HTTP {response.status_code} from remote API",
+                response=response
+            )
+
+        try:
+            return response.json()
+        except ValueError as error:
+            raise RuntimeError(
+                "Remote API returned invalid JSON"
+            ) from error

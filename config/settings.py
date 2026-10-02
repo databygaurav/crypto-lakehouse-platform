@@ -12,9 +12,13 @@ load_dotenv()
 BINANCE_API_KEY = os.getenv("BINANCE_API_KEY")
 BINANCE_SECRET_KEY = os.getenv("BINANCE_SECRET_KEY")
 
-# Giottus
+# Giottus credentials 
 GIOTTUS_API_KEY = os.getenv("GIOTTUS_API_KEY")
 GIOTTUS_SECRET_KEY = os.getenv("GIOTTUS_SECRET_KEY")
+
+# CoinDCX credentials are used only for the current-balance endpoint.
+COINDCX_API_KEY = os.getenv("COINDCX_API_KEY")
+COINDCX_SECRET_KEY = os.getenv("COINDCX_SECRET_KEY")
 
 # S3 credentials are optional when your normal AWS login or IAM role is used.
 AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
@@ -24,8 +28,8 @@ AWS_S3_BUCKET = os.getenv("AWS_S3_BUCKET")
 
 # Change this date when you want ingestion to begin from another day.
 BINANCE_HISTORY_START = datetime(
-    2026,
-    1,
-    1,
+    2025,
+    5,
+    29,
     tzinfo=timezone.utc,
 )

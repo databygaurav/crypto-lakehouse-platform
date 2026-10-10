@@ -26,6 +26,16 @@ AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
 AWS_REGION = os.getenv("AWS_REGION", "ap-south-1")
 AWS_S3_BUCKET = os.getenv("AWS_S3_BUCKET")
 
+# Phantom public wallet address.
+PHANTOM_SOLANA_ADDRESS = os.getenv("PHANTOM_SOLANA_ADDRESS")
+PHANTOM_ETHEREUM_ADDRESS = os.getenv("PHANTOM_ETHEREUM_ADDRESS")
+PHANTOM_BITCOIN_ADDRESS = os.getenv("PHANTOM_BITCOIN_ADDRESS")
+PHANTOM_SUI_ADDRESS = os.getenv("PHANTOM_SUI_ADDRESS")
+
+# Helius & Ankr API key for reading blockchain data.
+HELIUS_API_KEY=os.getenv("HELIUS_API_KEY")
+ANKR_API_KEY=os.getenv("ANKR_API_KEY")
+
 # Change this date when you want ingestion to begin from another day.
 BINANCE_HISTORY_START = datetime(
     2025,
